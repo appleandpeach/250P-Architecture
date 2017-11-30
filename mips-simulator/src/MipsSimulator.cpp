@@ -9,8 +9,8 @@
 
 void MipsSimulator::parseRegisters(string regs){
 	string delim = ",";
-	auto start = 0U;
-	auto end = regs.find(delim);
+	size_t start = 0U;
+	size_t end = regs.find(delim);
 	int cnt = 0;
 	while (end != std::string::npos){
 		this->registers[cnt] = stoi(regs.substr(start, end - start));
@@ -25,56 +25,183 @@ void MipsSimulator::parseRegisters(string regs){
 
 string MipsSimulator::getOperator(string instruction){
 	string delim = " ";
-	auto start = 0U;
-	auto end = instruction.find(delim);
+	size_t start = 0U;
+	size_t end = instruction.find(delim);
 	string res = instruction.substr(start, end - start);
-	if(res.size() > 5)
+	if(res.size() > 5){
 		res = res.substr(0, 5);
+		if(this->labelsPosition.find(res) == this->labelsPosition.end()){
+			this->labelsPosition[res] = this->index;
+		}
+	}
 	return res;
 }
 
-bool MipsSimulator::executeInstruction(string instruction){
-	string opt = this->getOperator(instruction);
-	string opr1 = 0;
-	switch(opt){
-	case "add":{
+operator_code MipsSimulator::hasHit (string optr) {
+    if (optr == "add") return operator_code::add;
+    if (optr == "addi") return operator_code::addi;
+    if (optr == "sub") return operator_code::sub;
+    if (optr == "mul") return operator_code::mul;
+    if (optr == "div") return operator_code::div;
+    if (optr == "b") return operator_code::b;
+    if (optr == "beq") return operator_code::beq;
+    if (optr == "bnq") return operator_code::bnq;
+    if (optr == "end") return operator_code::end;
+    if (optr == "label") return operator_code::label;
+    return operator_code::err;
+}
 
+
+bool MipsSimulator::analyzeInstructions(){
+	cout << this->instructions.size() << endl;
+	while(this->index < this->instructions.size()){
+		this->executeInstruction(this->instructions[this->index]);
+	}
+	return true;
+}
+
+int MipsSimulator::getOutputRegister(string instruction){
+	string dollar = "$";
+	size_t start = instruction.find(dollar);
+	string reg = instruction.substr(++start, 1);
+	int res = stoi(reg);
+	return res;
+}
+
+void MipsSimulator::setOperand(string instruction, int &operand1, int &operand2){
+	size_t start = instruction.find(",");
+
+	// set operand 1
+	start++;
+	if(instruction.at(start) == '$'){
+		start++;
+		string numStr = instruction.substr(start, 1);
+		cout << "register num = " << numStr << endl;
+		operand1 = this->registers[stoi(numStr)];
+		start++;
+	}else{
+		size_t end = instruction.find(",", start);
+		string numStr = instruction.substr(start, end);
+		operand1 = stoi(numStr);
+		start = end;
+	}
+
+	// set operand 2
+	start++;
+	if(instruction.at(start) == '$'){
+		start++;
+		string numStr = instruction.substr(start, 1);
+		cout << "register num = " << numStr << endl;
+		operand2 = this->registers[stoi(numStr)];
+		start++;
+	} else {
+		start++;
+		size_t end = instruction.find("\0", start);
+		string numStr = instruction.substr(start, end);
+		cout << numStr << endl;
+		operand2 = stoi(numStr);
+		start += numStr.size();
+	}
+
+}
+
+
+string MipsSimulator::removeLabelInstruction(string instruction){
+	size_t start = instruction.find(" ");
+	return instruction.substr(start+1);
+}
+
+bool MipsSimulator::executeInstruction(string instruction){
+	cout << endl << instruction << endl;;
+	// get operator
+	string opt = this->getOperator(instruction);
+
+	// calculate the result
+	switch(this->hasHit(opt)){
+	case operator_code::add:{
+		// get output register
+		int outputReg = this->getOutputRegister(instruction);
+		// set operand
+		int operand1 = 0, operand2 = 0;
+		this->setOperand(instruction, operand1, operand2);
+		cout << "operand1 = " << operand1 << endl;
+		cout << "operand2 = " << operand2 << endl;
+		// execute
+		this->registers[outputReg] = operand1 + operand2;
 		break;
 	}
-	case "addi": {
+	case operator_code::addi: {
+		int outputReg = this->getOutputRegister(instruction);
+		int operand1 = 0, operand2 = 0;
+		this->setOperand(instruction, operand1, operand2);
+		cout << "operand1 = " << operand1 << endl;
+		cout << "operand2 = " << operand2 << endl;
+		this->registers[outputReg] = operand1 + operand2;
 		break;
 	}
-	case "sub": {
+	case operator_code::sub: {
+		int outputReg = this->getOutputRegister(instruction);
+		int operand1 = 0, operand2 = 0;
+		this->setOperand(instruction, operand1, operand2);
+		cout << "operand1 = " << operand1 << endl;
+		cout << "operand2 = " << operand2 << endl;
+		this->registers[outputReg] = operand1 - operand2;
 		break;
 	}
-	case "mul": {
+	case operator_code::mul: {
+		int outputReg = this->getOutputRegister(instruction);
+		int operand1 = 0, operand2 = 0;
+		this->setOperand(instruction, operand1, operand2);
+		cout << "operand1 = " << operand1 << endl;
+		cout << "operand2 = " << operand2 << endl;
+		this->registers[outputReg] = operand1 * operand2;
 		break;
 	}
-	case "div": {
+	case operator_code::div: {
+		int outputReg = this->getOutputRegister(instruction);
+		int operand1 = 0, operand2 = 0;
+		this->setOperand(instruction, operand1, operand2);
+		cout << "operand1 = " << operand1 << endl;
+		cout << "operand2 = " << operand2 << endl;
+		this->registers[outputReg] = operand1 / operand2;
 		break;
 	}
-	case "beq": {
+	case operator_code::b: {
 		break;
 	}
-	case "bnq": {
+	case operator_code::beq: {
 		break;
 	}
-	case "end": {
+	case operator_code::bnq: {
 		break;
 	}
-	case "label": {
+	case operator_code::end: {
+		break;
+	}
+	case operator_code::label: {
+		instruction = this->removeLabelInstruction(instruction);
+		this->executeInstruction(instruction);
 		break;
 	}
 	default:{
 		cout << "Your inpurt operator is illegal, please check again!" << endl;
+		this->index++;
 		return false;
 	}
 	}
+	this->index++;
+
+	cout << endl;
+	for(int i=0;i<8;i++)
+		cout << this->registers[i] << ", ";
+	cout << endl;
+
 	return true;
 }
 
 
 MipsSimulator::MipsSimulator(string regs) {
+	this->index = 0;
 	parseRegisters(regs);
 	// TODO Auto-generated constructor stub
 }

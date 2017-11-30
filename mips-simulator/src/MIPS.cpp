@@ -11,18 +11,32 @@
 #include "MipsSimulator.h"
 using namespace std;
 
+
+bool mipsSimulate(char* filename){
+	FileStream fs(filename);
+	if (fs.openFile()) {
+		string regs = "";
+		// get registers' values
+		fs.getNextInstruction(regs);
+
+		// initiate mips simulator
+		MipsSimulator ms(regs);
+
+		// get instructions
+		string instruction = "";
+		while (fs.getNextInstruction(instruction)) {
+			ms.instructions.push_back(instruction);
+		}
+
+		// analyze instruction
+		ms.analyzeInstructions();
+	}else{
+		return false;
+	}
+	return true;
+}
+
 int main() {
-//	FileStream fs("test1.txt");
-//
-//	if(fs.openFile()){
-//		string regs = "";
-//		fs.getNextInstruction(regs);
-//		MipsSimulator ms(regs);
-//	}
-
-	string regs = "2,4,6,88,67,45,44,89";
-	MipsSimulator ms(regs);
-	string ins1 = "add $0,$1,$2";
-
+	mipsSimulate("test1.txt");
 	return 0;
 }

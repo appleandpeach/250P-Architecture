@@ -23,10 +23,20 @@ bool FileStream::closeFile(){
     return true;
 }
 
+bool IsSpace (int ch) {
+	return !std::isspace(ch);
+}
+
+
+static inline void rtrim(string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), IsSpace).base(), s.end());
+}
+
 bool FileStream::getNextInstruction(string &instruction){
 	instruction = "";
 	if(!this->inFile.eof()) {
-		this->inFile >> instruction;
+		getline(this->inFile, instruction);
+		rtrim(instruction);
 		if(instruction == "")
 			return false;
 		return true;

@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
-
+#include <algorithm>
 #define EOF (-1)
 
 using namespace std;
