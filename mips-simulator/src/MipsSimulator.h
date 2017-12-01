@@ -44,14 +44,23 @@ public:
 	MipsSimulator(string regs);
 	virtual ~MipsSimulator();
 
+	// logical functions
 	void parseRegisters(string regs);
 	bool executeInstruction(string instruction);
 	bool analyzeInstructions();
-	string getOperator(string instruction);
-	int getOutputRegister(string instruction);
+
+	// helper
 	operator_code hasHit (string optr);
-	void setOperand(string instruction, int &operand1, int &operand2);
 	string removeLabelInstruction(string instruction);
+
+
+	// get and set functions
+	string getOperator(string instruction);
+	string getLabel(string instruction);
+	int getOutputRegister(string instruction);
+
+	bool setOperand(string instruction, string opt, int &operand1, int &operand2);
+	void setLabelsIndex(string instruction, int cnt);
 };
 
 #endif /* MIPSSIMULATOR_H_ */

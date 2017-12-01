@@ -24,10 +24,12 @@ bool mipsSimulate(char* filename){
 
 		// get instructions
 		string instruction = "";
+		int cnt = 0;
 		while (fs.getNextInstruction(instruction)) {
 			ms.instructions.push_back(instruction);
+			ms.setLabelsIndex(instruction, cnt);
+			cnt++;
 		}
-
 		// analyze instruction
 		ms.analyzeInstructions();
 	}else{

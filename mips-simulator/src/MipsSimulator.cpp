@@ -68,8 +68,18 @@ int MipsSimulator::getOutputRegister(string instruction){
 	return res;
 }
 
-void MipsSimulator::setOperand(string instruction, int &operand1, int &operand2){
-	size_t start = instruction.find(",");
+
+bool MipsSimulator::setOperand(string instruction, string opt, int &operand1, int &operand2){
+	// if opt is b, there's no need to set operands
+	if(opt == "b" || opt == "end" || opt == "label")
+		return false;
+
+	// different start for setting operands
+	size_t start;
+	if(opt == "beq" || opt == "bnq")
+		start = instruction.find(" ");
+	else
+		start = instruction.find(",");
 
 	// set operand 1
 	start++;
@@ -103,6 +113,7 @@ void MipsSimulator::setOperand(string instruction, int &operand1, int &operand2)
 		start += numStr.size();
 	}
 
+	return true;
 }
 
 
@@ -111,68 +122,89 @@ string MipsSimulator::removeLabelInstruction(string instruction){
 	return instruction.substr(start+1);
 }
 
+void MipsSimulator::setLabelsIndex(string instruction, int cnt){
+	string labelName = instruction.substr(0, 5);
+	if(labelName != "label")
+		return;
+	string space = " ";
+	size_t end = instruction.find(space);
+	labelName = instruction.substr(0, end);
+	cout << "labelName: " << labelName << endl;
+	this->labelsPosition[labelName] = cnt;
+}
+
+string MipsSimulator::getLabel(string instruction){
+	size_t start = instruction.find("label", 0);
+	string res = instruction.substr(start, instruction.size()-start);
+	cout << "branch label is " << res << endl;
+	return res;
+}
+
 bool MipsSimulator::executeInstruction(string instruction){
-	cout << endl << instruction << endl;;
+	cout << endl << instruction << endl;
 	// get operator
 	string opt = this->getOperator(instruction);
+
+	// set operand
+	int operand1 = 0, operand2 = 0;
+	this->setOperand(instruction, opt, operand1, operand2);
+	cout << "operand1 = " << operand1 << endl;
+	cout << "operand2 = " << operand2 << endl;
 
 	// calculate the result
 	switch(this->hasHit(opt)){
 	case operator_code::add:{
 		// get output register
 		int outputReg = this->getOutputRegister(instruction);
-		// set operand
-		int operand1 = 0, operand2 = 0;
-		this->setOperand(instruction, operand1, operand2);
-		cout << "operand1 = " << operand1 << endl;
-		cout << "operand2 = " << operand2 << endl;
 		// execute
 		this->registers[outputReg] = operand1 + operand2;
 		break;
 	}
 	case operator_code::addi: {
 		int outputReg = this->getOutputRegister(instruction);
-		int operand1 = 0, operand2 = 0;
-		this->setOperand(instruction, operand1, operand2);
-		cout << "operand1 = " << operand1 << endl;
-		cout << "operand2 = " << operand2 << endl;
 		this->registers[outputReg] = operand1 + operand2;
 		break;
 	}
 	case operator_code::sub: {
 		int outputReg = this->getOutputRegister(instruction);
-		int operand1 = 0, operand2 = 0;
-		this->setOperand(instruction, operand1, operand2);
-		cout << "operand1 = " << operand1 << endl;
-		cout << "operand2 = " << operand2 << endl;
 		this->registers[outputReg] = operand1 - operand2;
 		break;
 	}
 	case operator_code::mul: {
 		int outputReg = this->getOutputRegister(instruction);
-		int operand1 = 0, operand2 = 0;
-		this->setOperand(instruction, operand1, operand2);
-		cout << "operand1 = " << operand1 << endl;
-		cout << "operand2 = " << operand2 << endl;
 		this->registers[outputReg] = operand1 * operand2;
 		break;
 	}
 	case operator_code::div: {
 		int outputReg = this->getOutputRegister(instruction);
-		int operand1 = 0, operand2 = 0;
-		this->setOperand(instruction, operand1, operand2);
-		cout << "operand1 = " << operand1 << endl;
-		cout << "operand2 = " << operand2 << endl;
+		if(operand2 == 0){
+			cout << "Numerator should not be 0!" << endl;
+			return false;
+		}
 		this->registers[outputReg] = operand1 / operand2;
 		break;
 	}
 	case operator_code::b: {
-		break;
+		string labelName = this->getLabel(instruction);
+		this->index = this->labelsPosition[labelName];
+		return true;
 	}
 	case operator_code::beq: {
+		if(operand1 == operand2){
+			string labelName = this->getLabel(instruction);
+			this->index = this->labelsPosition[labelName];
+			cout << "current index is " << this->index << endl;
+			return true;
+		}
+		cout << "current index is " << this->index << endl;
 		break;
 	}
 	case operator_code::bnq: {
+		if (operand1 != operand2) {
+			string labelName = this->getLabel(instruction);
+			this->index = this->labelsPosition[labelName];
+			return true;
+		}
 		break;
 	}
 	case operator_code::end: {
@@ -181,7 +213,7 @@ bool MipsSimulator::executeInstruction(string instruction){
 	case operator_code::label: {
 		instruction = this->removeLabelInstruction(instruction);
 		this->executeInstruction(instruction);
-		break;
+		return true;
 	}
 	default:{
 		cout << "Your inpurt operator is illegal, please check again!" << endl;
@@ -193,7 +225,7 @@ bool MipsSimulator::executeInstruction(string instruction){
 
 	cout << endl;
 	for(int i=0;i<8;i++)
-		cout << this->registers[i] << ", ";
+		cout << this->registers[i] << " ";
 	cout << endl;
 
 	return true;
