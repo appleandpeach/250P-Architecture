@@ -9,6 +9,7 @@
 #include <iostream>
 #include "FileStream.hpp"
 #include "MipsSimulator.h"
+#include "pipeline.h"
 using namespace std;
 
 
@@ -38,7 +39,34 @@ bool mipsSimulate(char* filename){
 	return true;
 }
 
+bool mipsPipeline(char* filename){
+	FileStream fs(filename);
+	if (fs.openFile()) {
+		string regs = "";
+		// get registers' values
+		fs.getNextInstruction(regs);
+
+		// initiate mips simulator
+		pipeline pl(regs);
+
+		// get instructions
+		string instruction = "";
+		int cnt = 0;
+		while (fs.getNextInstruction(instruction)) {
+			pl.instructions.push_back(instruction);
+			pl.setLabelsIndex(instruction, cnt);
+			cnt++;
+		}
+		// analyze instruction
+		pl.analyzeInstructions();
+	} else {
+		return false;
+	}
+	return true;
+}
+
 int main() {
 	mipsSimulate("test1.txt");
+	mipsPipeline("test1.txt");
 	return 0;
 }

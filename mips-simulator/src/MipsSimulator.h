@@ -35,7 +35,7 @@ enum operator_code {
 class MipsSimulator {
 public:
 	int index;
-	int registers[8];
+	vector<int> registers;
 	vector<string> instructions;
 	unordered_map<string, int> labelsPosition;
 

@@ -234,6 +234,7 @@ bool MipsSimulator::executeInstruction(string instruction){
 
 MipsSimulator::MipsSimulator(string regs) {
 	this->index = 0;
+	this->registers.resize(8,0);
 	parseRegisters(regs);
 	// TODO Auto-generated constructor stub
 }
