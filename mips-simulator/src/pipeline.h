@@ -31,23 +31,27 @@ enum operator_code {
 	err
 };
 
+
 struct InstructionFetchRegister{
-	int Rdest, Rsrc1, Rsrc2;
+	int Rdest;
+	int Rsrc1;
+	int Rsrc2;
 	int immediate;
 	int PC;
 	bool isBranch;
+	bool isStall;
 
-	InstructionFetchRegister& operator=(InstructionFetchRegister &right){
+	InstructionFetchRegister& operator=(const InstructionFetchRegister &right){
 		Rdest = right.Rdest;
 		Rsrc1 = right.Rsrc1;
 		Rsrc2 = right.Rsrc2;
 		immediate = right.immediate;
 		PC = right.PC;
 		isBranch = right.isBranch;
+		isStall = right.isStall;
 		return *this;
 	}
 };
-
 
 
 struct ExecuteRegister{
@@ -56,8 +60,9 @@ struct ExecuteRegister{
 	int  RdestVal, Rsrc1Val, Rsrc2Val;
 	int PC;
 	bool isBranch;
+	bool isStall;
 
-	ExecuteRegister& operator=(ExecuteRegister &right){
+	ExecuteRegister& operator=(const ExecuteRegister &right){
 		Rdest = right.Rdest;
 		Rsrc1 = right.Rsrc1;
 		Rsrc2 = right.Rsrc2;
@@ -67,38 +72,37 @@ struct ExecuteRegister{
 		Rsrc2Val = right.Rsrc2Val;
 		PC = right.PC;
 		isBranch = right.isBranch;
+		isStall = right.isStall;
 		return *this;
 	}
 };
 
+
 class pipeline;
+
 
 class InstructionFetchStage {
 public:
 	pipeline *pl;
 	InstructionFetchRegister ifReg;
 
-	void Excute(){
-		this->ifReg.PC++;
-		if(this->ifReg.PC >= this->pl->instructions.size()) return;
-		string instruction = this->pl->instructions[this->ifReg.PC];
-		this->ifReg.Rdest = this->pl->getOutputRegister(instruction);
-		this->ifReg.Rsrc1 = this->pl->getFirstRegister(instruction);
-		this->ifReg.Rsrc2 = this->pl->getSecondRegister(instruction);
-		this->ifReg.immediate = 0;
-		string opt = this->pl->getOperator(instruction);
-		if(opt == 'b' || opt == "beq" || opt == "bnq")
-			this->ifReg.isBranch = true;
-		else
-			this->ifReg.isBranch = false;
-	}
-
+	void Excute();
 	InstructionFetchStage(pipeline * p){
 		this->pl = p;
-		this->ifReg = {0, 0, 0, 0, -1, false};
+		this->ifReg.PC = -1;
+		this->ifReg.Rdest = 0;
+		this->ifReg.Rsrc1 = 0;
+		this->ifReg.Rsrc2 = 0;
+		this->ifReg.immediate = 0;
+		this->ifReg.isBranch = false;
+		this->ifReg.isStall = false;
+
 	}
-	virtual ~InstructionFetchStage();
+	virtual ~InstructionFetchStage(){
+		this->pl = NULL;
+	}
 };
+
 
 class ExecuteStage {
 public:
@@ -106,57 +110,71 @@ public:
 	InstructionFetchRegister ifReg;
 	ExecuteRegister eReg;
 
-	void Excute(){
-		if(this->ifReg.PC == -1) return;
-		this->eReg.PC++;
-		if(this->eReg.PC >= this->pl->instructions.size()) return;
-		string instruction = this->pl->instructions[this->ifReg.PC];
-		string opt = this->pl->getOperator(instruction);
-		this->eReg.Rdest = this->ifReg.Rdest;
-		this->eReg.Rsrc1 = this->ifReg.Rsrc1;
-		this->eReg.Rsrc2 = this->ifReg.Rsrc2;
-		this->eReg.Rsrc1Val = this->pl->registers[this->ifReg.Rsrc1];
-		this->eReg.Rsrc2Val = this->pl->registers[this->ifReg.Rsrc2];
-		this->eReg.immediate = this->pl->getImmediate(instruction);
-		this->eReg.RdestVal = this->pl->executeInstruction(opt);
-		this->eReg.isBranch = this->ifReg.isBranch;
-	}
-	void Shift(){
-		this->ifReg = this->pl->ifs.ifReg;
-	}
+	void Excute();
+	void Shift();
+
 
 	ExecuteStage(pipeline * p){
 		this->pl = p;
-		this->ifReg = {0, 0, 0, 0, -1, false};
-		this->eReg = {0, 0, 0, 0, 0, 0, 0, -1, false};
+
+		this->ifReg.PC = -1;
+		this->ifReg.Rdest = 0;
+		this->ifReg.Rsrc1 = 0;
+		this->ifReg.Rsrc2 = 0;
+		this->ifReg.immediate = 0;
+		this->ifReg.isBranch = false;
+		this->ifReg.isStall = false;
+
+		this->eReg.PC = -1;
+		this->eReg.Rdest = 0;
+		this->eReg.RdestVal = 0;
+		this->eReg.Rsrc1 = 0;
+		this->eReg.Rsrc1Val = 0;
+		this->eReg.Rsrc2 = 0;
+		this->eReg.Rsrc2Val = 0;
+		this->eReg.immediate = 0;
+		this->eReg.isBranch = false;
+		this->eReg.isStall = false;
+
 	}
-	virtual ~ExecuteStage();
+	virtual ~ExecuteStage(){
+		this->pl = NULL;
+	}
 };
+
 
 class WriteBackStage {
 public:
 	pipeline *pl;
 	ExecuteRegister eReg;
 
-	void Excute(){
-		if(this->eReg.PC == -1) return;
-		if(this->eReg.PC >= this->pl->instructions.size()) return;
-		this->pl->registers[this->eReg.Rdest] = this->eReg.RdestVal;
-	}
-	void Shift(){
-		this->eReg = this->pl->es.eReg;
-	}
+	void Excute();
+	void Shift();
 
 	WriteBackStage(pipeline * p){
 		this->pl = p;
-		this->eReg = {0, 0, 0, 0, 0, 0, 0, -1, false};
+
+		this->eReg.PC = -1;
+		this->eReg.Rdest = 0;
+		this->eReg.RdestVal = 0;
+		this->eReg.Rsrc1 = 0;
+		this->eReg.Rsrc1Val = 0;
+		this->eReg.Rsrc2 = 0;
+		this->eReg.Rsrc2Val = 0;
+		this->eReg.immediate = 0;
+		this->eReg.isBranch = false;
+		this->eReg.isStall = false;
 	}
-	virtual ~WriteBackStage();
+	virtual ~WriteBackStage(){
+		this->pl = NULL;
+	}
 };
+
 
 class pipeline {
 public:
 	vector<int> registers;
+	int cycle;
 	int pc;
 	vector<string> instructions;
 	unordered_map<string, int> labelsPosition;
@@ -226,14 +244,13 @@ public:
 
 
 	bool analyzeInstructions(){
-		cout << "program contains " << this->instructions.size() << "instructions" << endl;
-		while(this->pc < this->instructions.size()){
+		cout << "Program contains " << this->instructions.size() << " instructions." << endl;
+		while(this->wbs.eReg.PC < (int)this->instructions.size()){
 			this->ifs.Excute();
 			this->es.Excute();
 			this->wbs.Excute();
 			this->es.Shift();
 			this->wbs.Shift();
-			this->executeInstruction(this->instructions[this->pc]);
 		}
 		return true;
 	}
@@ -252,6 +269,8 @@ public:
 		string dollar = "$";
 		size_t start = instruction.find(dollar);
 		start = instruction.find(dollar, ++start);
+		if(start == string::npos)
+			return -1;
 		string reg = instruction.substr(++start, 1);
 		int res = stoi(reg);
 		return res;
@@ -259,6 +278,9 @@ public:
 
 
 	int getSecondRegister(string instruction){
+		string opt = this->getOperator(instruction);
+		if(opt == "addi")
+			return 0;
 		string dollar = "$";
 		size_t start = instruction.find(dollar);
 		start = instruction.find(dollar, ++start);
@@ -266,17 +288,25 @@ public:
 		string reg = instruction.substr(++start, 1);
 		int res = stoi(reg);
 		return res;
-		return 0;
 	}
 
 
 	int getImmediate(string instruction){
 		string sharp = "#";
 		size_t start = instruction.find(sharp);
-		string reg = instruction.substr(++start, 1);
+		if(start == string::npos)
+			return 0;
+		size_t label = instruction.find("label");
+		string reg = "";
+		if(label == string::npos)
+			reg = instruction.substr(++start, instruction.size() - start);
+		else
+			reg = instruction.substr(++start, label - start + 1);
 		int res = stoi(reg);
 		return res;
 	}
+
+
 	bool setOperand(string instruction, string opt, int &operand1, int &operand2){
 		// if opt is b, there's no need to set operands
 		if(opt == "b" || opt == "end" || opt == "label")
@@ -339,103 +369,230 @@ public:
 	}
 
 
-	bool executeInstruction(string instruction){
-		// set operand
-		int operand1 = 0, operand2 = 0;
-		this->setOperand(instruction, opt, operand1, operand2);
-		cout << "operand1 = " << operand1 << endl;
-		cout << "operand2 = " << operand2 << endl;
-
-		// calculate the result
+	int executeInstruction(int operand1, int operand2, int immediate, string &opt, string &instruction){
 		switch(this->hasHit(opt)){
 		case operator_code::add:{
-			// get output register
-			int outputReg = this->getOutputRegister(instruction);
-			// execute
-			this->registers[outputReg] = operand1 + operand2;
-			break;
+			return operand1 + operand2;
 		}
 		case operator_code::addi: {
-			int outputReg = this->getOutputRegister(instruction);
-			this->registers[outputReg] = operand1 + operand2;
-			break;
+			return operand1 + immediate;
 		}
 		case operator_code::sub: {
-			int outputReg = this->getOutputRegister(instruction);
-			this->registers[outputReg] = operand1 - operand2;
-			break;
+			return operand1 - operand2;
 		}
 		case operator_code::mul: {
-			int outputReg = this->getOutputRegister(instruction);
-			this->registers[outputReg] = operand1 * operand2;
-			break;
+			return operand1 * operand2;
 		}
 		case operator_code::div: {
-			int outputReg = this->getOutputRegister(instruction);
 			if(operand2 == 0){
 				cout << "Numerator should not be 0!" << endl;
-				return false;
+				return 0;
 			}
-			this->registers[outputReg] = operand1 / operand2;
-			break;
+			return operand1 / operand2;
 		}
 		case operator_code::b: {
 			string labelName = this->getLabel(instruction);
-			this->pc = this->labelsPosition[labelName];
+			this->ifs.ifReg.PC = this->labelsPosition[labelName] - 1;
 			return true;
 		}
 		case operator_code::beq: {
-			if(operand1 == operand2){
-				string labelName = this->getLabel(instruction);
-				this->pc = this->labelsPosition[labelName];
-				cout << "current index is " << this->pc << endl;
-				return true;
+			if (instruction.find("#") != string::npos) {
+				if (operand1 == immediate) {
+					string labelName = this->getLabel(instruction);
+					// jump to the instruction before the target one, coz IF stage will increase 1
+					this->ifs.ifReg.PC = this->labelsPosition[labelName] - 1;
+					cout << "updated index is " << this->ifs.ifReg.PC << endl;
+					return true;
+				}
+			} else {
+				if (operand1 == operand2) {
+					string labelName = this->getLabel(instruction);
+					this->ifs.ifReg.PC = this->labelsPosition[labelName] - 1;
+					cout << "updated index is " << this->ifs.ifReg.PC << endl;
+					return true;
+				}
 			}
-			cout << "current index is " << this->pc << endl;
-			break;
+			cout << "current index is " << this->ifs.ifReg.PC << endl;
+			return false;
 		}
 		case operator_code::bnq: {
 			if (operand1 != operand2) {
 				string labelName = this->getLabel(instruction);
-				this->pc = this->labelsPosition[labelName];
-				return true;
+				this->ifs.ifReg.PC = this->labelsPosition[labelName];
+				return 1;
 			}
-			break;
+			return -1;
 		}
 		case operator_code::end: {
-			break;
+			return 0;
 		}
 		case operator_code::label: {
 			instruction = this->removeLabelInstruction(instruction);
-			this->executeInstruction(instruction);
-			return true;
+			opt = this->getOperator(instruction);
+			return this->executeInstruction(operand1, operand2, immediate, opt, instruction);
 		}
 		default:{
 			cout << "Your inpurt operator is illegal, please check again!" << endl;
-			this->pc++;
-			return false;
+			return 0;
 		}
 		}
-		this->pc++;
-
-		cout << endl;
-		for(int i=0;i<8;i++)
-			cout << this->registers[i] << " ";
-		cout << endl;
-
-		return true;
 	}
 
 
 	pipeline(string regs) : ifs(this), es(this), wbs(this) {
+		this->cycle = 0;
 		this->pc = 0;
 		this->registers.resize(8,0);
 		this->parseRegisters(regs);
 	}
 
 
-	virtual ~pipeline();
+	virtual ~pipeline(){}
 };
+
+
+void InstructionFetchStage::Excute() {
+	cout << "***************************************************************" << endl;
+	cout << endl << "IF stage:" << endl;
+
+	// if last instrucion is branch, stall a cycle
+	cout << "isBranch: " << this->ifReg.isBranch << endl;
+	if (this->ifReg.isBranch == true) {
+		this->ifReg.isBranch = false;
+		this->ifReg.isStall = true;
+		this->pl->cycle++;
+		return;
+	} else {
+		this->ifReg.isStall = false;
+	}
+
+	this->ifReg.PC++;
+	// if instruction is end, only increase cycle number
+	string instruction = this->pl->instructions[this->ifReg.PC];
+	cout << instruction << endl;
+	if (instruction == "end")
+		return;
+	if (this->ifReg.PC >= this->pl->instructions.size()) {
+		this->pl->cycle++;
+		return;
+	}
+
+	// if instruction is branch, set all -1.
+	// if instruction is comparion branch, set dest -1 and others relative values.
+	string opt = this->pl->getOperator(instruction);
+	if (opt == "b" || opt == "beq" || opt == "bnq") {
+		if (opt == "b") {
+			this->ifReg.Rdest = -1;
+			this->ifReg.Rsrc1 = -1;
+			this->ifReg.Rsrc2 = -1;
+			this->ifReg.immediate = 0;
+		} else {
+			this->ifReg.Rdest = -1;
+			this->ifReg.Rsrc1 = this->pl->getOutputRegister(instruction);
+			this->ifReg.Rsrc2 = this->pl->getFirstRegister(instruction);
+			this->ifReg.immediate = this->pl->getImmediate(instruction);
+		}
+		this->ifReg.isBranch = true;
+	} else {
+		this->ifReg.Rdest = this->pl->getOutputRegister(instruction);
+		this->ifReg.Rsrc1 = this->pl->getFirstRegister(instruction);
+		this->ifReg.Rsrc2 = this->pl->getSecondRegister(instruction);
+		this->ifReg.immediate = this->pl->getImmediate(instruction);
+		this->ifReg.isBranch = false;
+	}
+
+	cout << "dest: " << this->ifReg.Rdest << ", src1: " << this->ifReg.Rsrc1
+			<< ", src2: " << this->ifReg.Rsrc2 << ", immediate: "
+			<< this->ifReg.immediate << endl;
+
+	this->pl->cycle++;
+	cout << "current cycle is " << this->pl->cycle << endl;
+}
+
+
+void ExecuteStage::Excute() {
+	cout << endl << "EX stage:" << endl;
+	cout << "this->ifReg.PC " << this->ifReg.PC << endl;
+
+	cout << "isbranch: " << this->eReg.isBranch << endl;
+	if (this->ifReg.PC == -1)
+		return;
+	if(this->ifReg.isStall == true){
+		this->eReg.isStall = this->ifReg.isStall;
+		return;
+	}
+
+	this->eReg.PC++;
+	if (this->eReg.PC >= this->pl->instructions.size())
+		return;
+	string instruction = this->pl->instructions[this->ifReg.PC];
+	string opt = this->pl->getOperator(instruction);
+	cout  << "instruction is \"" << instruction << "\"" << endl;
+
+	// data forwarding
+	if(this->ifReg.Rsrc1 == this->eReg.Rdest)
+		this->eReg.Rsrc1Val = this->eReg.RdestVal;
+	else
+		this->eReg.Rsrc1Val = this->pl->registers[this->ifReg.Rsrc1];
+	if(this->ifReg.Rsrc2 == this->eReg.Rdest)
+		this->eReg.Rsrc2Val = this->eReg.RdestVal;
+	else
+		this->eReg.Rsrc2Val = this->pl->registers[this->ifReg.Rsrc2];
+
+	// calculate the result
+	this->eReg.RdestVal = this->pl->executeInstruction(this->eReg.Rsrc1Val, this->eReg.Rsrc2Val, this->ifReg.immediate, opt, instruction);
+	cout << "eReg.Rsrc1Val: " << eReg.Rsrc1Val<< " this->eReg.Rsrc2Val: " << this->eReg.Rsrc2Val << " this->eReg.RdestVal: "<< this->eReg.RdestVal << endl;
+	this->eReg.isBranch = this->ifReg.isBranch;
+	this->eReg.isStall = this->ifReg.isStall;
+	this->eReg.PC = this->ifReg.PC;
+	this->eReg.Rdest = this->ifReg.Rdest;
+	this->eReg.Rsrc1 = this->ifReg.Rsrc1;
+	this->eReg.Rsrc2 = this->ifReg.Rsrc2;
+	cout << "e.dest: " << eReg.Rdest<< " src1: " << this->eReg.Rsrc1 << " src2: "<< this->eReg.Rsrc2 << endl;
+	cout << "this->eReg.isStall: " << this->eReg.isStall <<endl;
+
+	// print cycle for branch
+	if(opt == "beq" || opt == "bnq" ||opt == "b")
+		cout << instruction << "\t<"<< pl->cycle << ">" << endl;
+}
+
+
+void ExecuteStage::Shift() {
+	this->ifReg = this->pl->ifs.ifReg;
+}
+
+
+void WriteBackStage::Excute() {
+	cout << endl << "WB stage:" << endl;
+	cout << "this->eReg.PC: " << this->eReg.PC << endl;
+
+	cout << "wb isStall? " << this->eReg.isStall <<endl;
+	if (this->eReg.PC == -1 || this->eReg.isStall == true){
+		return;
+	}
+
+	if (this->eReg.PC >= this->pl->instructions.size())
+		return;
+	this->pl->registers[this->eReg.Rdest] = this->eReg.RdestVal;
+	cout << "this->eReg.RdestVal "<<this->eReg.RdestVal << endl;
+	cout << "e.dest: " << eReg.Rdest<< " src1: " << this->eReg.Rsrc1 << " src2: "<< this->eReg.Rsrc2 << endl;
+	string instruction = this->pl->instructions[this->eReg.PC];
+	string opt = this->pl->getOperator(instruction);
+	if(opt != "b" || opt != "beq" || opt != "bnq")
+		cout  << "instruction is \"" << instruction << "\"" << endl;
+
+	// print cycle number except branch
+	cout << instruction << "\t<"<< pl->cycle << ">" << endl;
+
+	for (int i = 0; i < 8; i++)
+		cout << this->pl->registers[i] << " ";
+	cout << endl;
+}
+
+void WriteBackStage::Shift() {
+	this->eReg = this->pl->es.eReg;
+}
+
 
 
 #endif /* PIPELINE_H_ */
